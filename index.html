@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LARA Connect — Feature & Data-Flow Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e1116;
+    --ink-2: #1c2128;
+    --paper: #f5f1ea;
+    --paper-2: #ebe5d9;
+    --paper-3: #e0d8c6;
+    --rule: #c9bfa8;
+    --rule-soft: #d9d0bd;
+    --accent: #b8410e;     /* burnt sienna */
+    --accent-2: #2d5016;   /* deep forest */
+    --accent-3: #b08900;   /* ochre */
+    --accent-4: #1f4068;   /* blueprint blue */
+    --muted: #6b6358;
+    --soft: #8a8170;
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Inter Tight", -apple-system, system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    font-size: 15px;
+    background-image:
+      radial-gradient(at 12% 8%, rgba(184, 65, 14, 0.04) 0px, transparent 50%),
+      radial-gradient(at 88% 92%, rgba(45, 80, 22, 0.04) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* grain overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.1, 0 0 0 0 0.1, 0 0 0 0 0.1, 0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ===== LAYOUT ===== */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ===== SIDEBAR ===== */
+  aside.toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 2rem 1.5rem;
+    border-right: 1px solid var(--rule);
+    background: var(--paper-2);
+    background-image: linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%);
+  }
+
+  .toc-mark {
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: 1.5rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.25rem;
+  }
+
+  .toc-mark em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 400;
+  }
+
+  .toc-sub {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .toc-list {
+    list-style: none;
+  }
+
+  .toc-list li {
+    margin-bottom: 0.15rem;
+  }
+
+  .toc-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: 0.82rem;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+    border-left: 2px solid transparent;
+  }
+
+  .toc-list a:hover {
+    background: var(--paper-3);
+    color: var(--accent);
+    border-left-color: var(--accent);
+    padding-left: 0.75rem;
+  }
+
+  .toc-list a.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-left-color: var(--accent);
+  }
+
+  .toc-list a.active .toc-num {
+    color: var(--accent-3);
+  }
+
+  .toc-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--soft);
+    min-width: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  /* ===== MAIN ===== */
+  main {
+    padding: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 3rem;
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    padding: 5rem 3rem 4rem;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100%;
+    background-image:
+      linear-gradient(135deg, transparent 49.5%, var(--rule-soft) 49.5%, var(--rule-soft) 50.5%, transparent 50.5%),
+      linear-gradient(45deg, transparent 49.5%, var(--rule-soft) 49.5%, var(--rule-soft) 50.5%, transparent 50.5%);
+    background-size: 24px 24px;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .hero-tag::before {
+    content: "";
+    width: 32px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent);
+  }
+
+  .hero p.lede {
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+    font-weight: 300;
+    max-width: 640px;
+    margin-bottom: 2rem;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+    margin-top: 2rem;
+  }
+
+  .hero-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .hero-meta-item .label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .hero-meta-item .value {
+    font-family: var(--serif);
+    font-size: 1rem;
+    color: var(--ink);
+  }
+
+  /* ===== SECTIONS ===== */
+  section.doc-section {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .section-num {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+
+  .section-header h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 2.25rem;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .section-header h2 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  h3 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 1.4rem;
+    letter-spacing: -0.01em;
+    margin: 2.5rem 0 1rem;
+    padding-left: 1rem;
+    border-left: 3px solid var(--accent);
+  }
+
+  h3 .h3-num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-right: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  h4 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--ink-2);
+  }
+
+  p {
+    margin-bottom: 1rem;
+  }
+
+  strong { font-weight: 600; }
+
+  /* ===== TABLES ===== */
+  .table-wrap {
+    margin: 1.5rem 0;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    overflow-x: auto;
+    box-shadow: 4px 4px 0 var(--rule-soft);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  th {
+    text-align: left;
+    padding: 0.85rem 1rem;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover td {
+    background: var(--paper-2);
+  }
+
+  td strong {
+    color: var(--accent);
+  }
+
+  /* Two-col definition tables (the | | | feature blocks) */
+  .deftable td:first-child {
+    font-weight: 600;
+    color: var(--ink-2);
+    background: var(--paper-2);
+    width: 30%;
+    border-right: 1px solid var(--rule);
+  }
+
+  .deftable td:first-child strong {
+    color: var(--accent);
+  }
+
+  /* ===== FEATURE CARDS (collapsible) ===== */
+  .feature-card {
+    margin: 1rem 0;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .feature-card.open {
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .feature-card-header {
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: var(--paper);
+    transition: background 0.15s ease;
+    user-select: none;
+  }
+
+  .feature-card-header:hover {
+    background: var(--paper-2);
+  }
+
+  .feature-card-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .feature-card-title .fc-num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .feature-card-title .fc-name {
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    font-weight: 500;
+  }
+
+  .feature-card-title .fc-sibling {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    padding: 0.15rem 0.5rem;
+    background: var(--paper-3);
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+  }
+
+  .feature-card-toggle {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    color: var(--accent);
+    transition: transform 0.25s ease;
+    line-height: 1;
+  }
+
+  .feature-card.open .feature-card-toggle {
+    transform: rotate(45deg);
+  }
+
+  .feature-card-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .feature-card.open .feature-card-body {
+    max-height: 4000px;
+  }
+
+  .feature-card-body-inner {
+    padding: 0 1.5rem 1.5rem;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 1.25rem;
+  }
+
+  .feature-card-body ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .feature-card-body li {
+    padding: 0.4rem 0;
+    padding-left: 1.25rem;
+    position: relative;
+    font-size: 0.9rem;
+  }
+
+  .feature-card-body li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ===== CODE BLOCKS ===== */
+  pre {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    margin: 1.5rem 0;
+    border-left: 3px solid var(--accent);
+    position: relative;
+  }
+
+  pre::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--accent);
+    color: var(--paper);
+    padding: 0.2rem 0.75rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--paper-3);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+    color: var(--accent-2);
+  }
+
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  /* ASCII diagrams styled like blueprints */
+  pre.ascii-diagram {
+    background: #fdfbf4;
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent-4);
+    box-shadow: 4px 4px 0 var(--rule-soft);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  pre.ascii-diagram::before {
+    content: "DIAGRAM";
+    background: var(--accent-4);
+  }
+
+  /* ===== INTERACTIVE DIAGRAMS ===== */
+  .interactive-diagram {
+    margin: 2rem 0;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    box-shadow: 6px 6px 0 var(--rule-soft);
+    overflow: hidden;
+  }
+
+  .diagram-header {
+    padding: 1rem 1.5rem;
+    background: var(--ink);
+    color: var(--paper);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .diagram-title {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .diagram-hint {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent-3);
+    letter-spacing: 0.1em;
+  }
+
+  .diagram-body {
+    padding: 2rem;
+    min-height: 320px;
+    position: relative;
+  }
+
+  .diagram-legend {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--rule);
+    background: var(--paper-2);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    min-height: 60px;
+  }
+
+  .diagram-legend.active {
+    color: var(--ink);
+  }
+
+  .diagram-legend strong {
+    color: var(--accent);
+    font-family: var(--sans);
+    font-weight: 600;
+  }
+
+  /* Tabs hub diagram */
+  .hub-node {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .hub-node:hover {
+    fill: var(--accent);
+  }
+
+  .hub-node:hover + .hub-label {
+    fill: var(--paper);
+  }
+
+  .hub-node.active {
+    fill: var(--ink);
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+
+  .hub-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--ink);
+    text-anchor: middle;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .hub-node.active + .hub-label {
+    fill: var(--paper);
+  }
+
+  .hub-connector {
+    stroke: var(--rule);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    fill: none;
+  }
+
+  .hub-center {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+
+  /* Permission matrix interactive */
+  .matrix-interactive {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .matrix-interactive th {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.6rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .matrix-interactive th.role-col:hover {
+    background: var(--accent);
+  }
+
+  .matrix-interactive th.role-col.highlighted {
+    background: var(--accent);
+  }
+
+  .matrix-interactive td {
+    text-align: center;
+    padding: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+  }
+
+  .matrix-interactive td:first-child {
+    text-align: left;
+    font-family: var(--sans);
+    font-weight: 500;
+    background: var(--paper-2);
+  }
+
+  .matrix-interactive td.highlighted {
+    background: rgba(184, 65, 14, 0.1);
+    font-weight: 600;
+  }
+
+  .perm-yes { color: var(--accent-2); }
+  .perm-no { color: var(--accent); opacity: 0.5; }
+  .perm-maybe { color: var(--accent-3); }
+
+  /* Data flow toggle diagram */
+  .flow-toggle {
+    display: inline-flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--ink);
+  }
+
+  .flow-toggle button {
+    background: var(--paper);
+    border: none;
+    padding: 0.6rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-right: 1px solid var(--ink);
+    transition: all 0.15s;
+  }
+
+  .flow-toggle button:last-child { border-right: none; }
+
+  .flow-toggle button.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .flow-toggle button:hover:not(.active) {
+    background: var(--paper-2);
+  }
+
+  .flow-pane {
+    display: none;
+  }
+
+  .flow-pane.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Risk meter */
+  .risk-table .severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+
+  .severity-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .sev-high .severity-dot { background: var(--accent); }
+  .sev-medium .severity-dot { background: var(--accent-3); }
+  .sev-low .severity-dot { background: var(--accent-2); }
+
+  .sev-high { color: var(--accent); }
+  .sev-medium { color: var(--accent-3); }
+  .sev-low { color: var(--accent-2); }
+
+  /* Endpoint method badges */
+  .method {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 0.15em 0.4em;
+    background: var(--accent-4);
+    color: var(--paper);
+    border-radius: 2px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-right: 0.3em;
+  }
+
+  .method.post { background: var(--accent-2); }
+  .method.patch { background: var(--accent-3); }
+  .method.delete { background: var(--accent); }
+
+  /* Lists */
+  ul, ol {
+    margin: 0.5rem 0 1rem 1.5rem;
+  }
+
+  ul li, ol li {
+    margin: 0.3rem 0;
+  }
+
+  /* Pull quotes / callouts */
+  blockquote {
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    border-left: 3px solid var(--accent);
+    background: var(--paper-2);
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--ink-2);
+  }
+
+  /* Summary final card */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .summary-card {
+    padding: 1.5rem;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+  }
+
+  .summary-card.strength {
+    border-left: 4px solid var(--accent-2);
+  }
+
+  .summary-card.weakness {
+    border-left: 4px solid var(--accent);
+  }
+
+  .summary-card h4 {
+    margin-top: 0;
+    color: var(--ink);
+  }
+
+  .summary-card ul {
+    list-style: none;
+    margin: 0;
+  }
+
+  .summary-card li {
+    padding: 0.3rem 0;
+    padding-left: 1.25rem;
+    position: relative;
+    font-size: 0.88rem;
+    margin: 0;
+  }
+
+  .summary-card.strength li::before {
+    content: "+";
+    color: var(--accent-2);
+    font-weight: 700;
+    position: absolute;
+    left: 0;
+  }
+
+  .summary-card.weakness li::before {
+    content: "−";
+    color: var(--accent);
+    font-weight: 700;
+    position: absolute;
+    left: 0;
+  }
+
+  /* Footer */
+  footer {
+    padding: 3rem;
+    text-align: center;
+    border-top: 1px solid var(--rule);
+    background: var(--paper-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* Mobile */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.toc {
+      position: relative;
+      height: auto;
+      max-height: 320px;
+    }
+    .container { padding: 0 1.5rem; }
+    .hero { padding: 3rem 1.5rem; }
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Print styles */
+  @media print {
+    aside.toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    .feature-card-body { max-height: none !important; }
+    .feature-card { break-inside: avoid; }
+  }
+
+  /* Smooth scroll-to behavior */
+  section.doc-section { scroll-margin-top: 1rem; }
+
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="toc">
+    <div class="toc-mark">LARA <em>Connect</em></div>
+    <div class="toc-sub">Internal Reference · v0.1</div>
+    <ul class="toc-list" id="toc-list">
+      <li><a href="#sec-1"><span class="toc-num">01</span> Product Overview</a></li>
+      <li><a href="#sec-2"><span class="toc-num">02</span> Core Features</a></li>
+      <li><a href="#sec-3"><span class="toc-num">03</span> Roles & Permissions</a></li>
+      <li><a href="#sec-4"><span class="toc-num">04</span> User Flow</a></li>
+      <li><a href="#sec-5"><span class="toc-num">05</span> Data Flow</a></li>
+      <li><a href="#sec-6"><span class="toc-num">06</span> Architecture</a></li>
+      <li><a href="#sec-7"><span class="toc-num">07</span> Entities</a></li>
+      <li><a href="#sec-8"><span class="toc-num">08</span> API</a></li>
+      <li><a href="#sec-9"><span class="toc-num">09</span> AI Features</a></li>
+      <li><a href="#sec-10"><span class="toc-num">10</span> Notifications</a></li>
+      <li><a href="#sec-11"><span class="toc-num">11</span> Security</a></li>
+      <li><a href="#sec-12"><span class="toc-num">12</span> Scalability</a></li>
+      <li><a href="#sec-13"><span class="toc-num">13</span> Risks</a></li>
+      <li><a href="#sec-14"><span class="toc-num">14</span> Summary</a></li>
+    </ul>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main>
+
+    <!-- HERO -->
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="hero-tag">Internal Product Reference</div>
+        <h1>LARA <em>Connect</em><br>Feature &amp; Data-Flow Documentation</h1>
+        <p class="lede">The collaboration layer of the LARA suite — a unified project workspace where architecture, engineering and construction teams run their projects day-to-day.</p>
+        <div class="hero-meta">
+          <div class="hero-meta-item">
+            <span class="label">Version</span>
+            <span class="value">v0.1</span>
+          </div>
+          <div class="hero-meta-item">
+            <span class="label">Scope</span>
+            <span class="value">repo/UI · 2026-05-18</span>
+          </div>
+          <div class="hero-meta-item">
+            <span class="label">Audience</span>
+            <span class="value">PMs · Engineering · Design</span>
+          </div>
+          <div class="hero-meta-item">
+            <span class="label">Status</span>
+            <span class="value">Prototype</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 1 -->
+    <section class="doc-section" id="sec-1">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 01</span>
+          <h2>Product <em>Overview</em></h2>
+        </div>
+
+        <p><strong>LARA Connect</strong> is the collaboration layer of the LARA suite — a unified project workspace where architecture, engineering and construction teams run their projects day-to-day.</p>
+
+        <div class="table-wrap">
+          <table class="deftable">
+            <tr><td><strong>What it does</strong></td><td>Brings chat, tasks, tickets, files, meetings, notes and project intelligence into a single per-project workspace, scoped by Service Arm (Architecture, MEP, Structural, etc.).</td></tr>
+            <tr><td><strong>Main purpose</strong></td><td>Eliminate context-switching between Slack/Jira/Drive/Zoom by giving every project a single command center linked to the broader LARA module ecosystem (Pulse, Markup, Resolve, Pivot, Lens, Meet).</td></tr>
+            <tr><td><strong>Target users</strong></td><td>Project Managers, Architects, MEP/Structural engineers, BIM coordinators, QS, Interior teams, and clients invited to specific projects.</td></tr>
+            <tr><td><strong>Core value proposition</strong></td><td>One channel per project arm, every artefact in the same place, an AI assistant that already knows the project's tasks/tickets/notes, and one-click deep-link to the sibling LARA modules.</td></tr>
+          </table>
+        </div>
+
+        <!-- Interactive: Channel hub diagram -->
+        <div class="interactive-diagram" id="hub-diagram">
+          <div class="diagram-header">
+            <span class="diagram-title">▸ Channel Architecture</span>
+            <span class="diagram-hint">Click a tab to learn more</span>
+          </div>
+          <div class="diagram-body">
+            <svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+              <!-- connectors -->
+              <g id="hub-connectors"></g>
+              <!-- center -->
+              <circle cx="350" cy="190" r="48" class="hub-center"/>
+              <text x="350" y="185" text-anchor="middle" font-family="Fraunces, serif" font-size="13" fill="#f5f1ea" font-style="italic">Channel</text>
+              <text x="350" y="202" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#f5f1ea" letter-spacing="2">PROJECT × ARM</text>
+
+              <!-- nodes -->
+              <g id="hub-nodes"></g>
+            </svg>
+          </div>
+          <div class="diagram-legend" id="hub-legend">
+            <strong>Click any tab</strong> on the diagram to see its purpose and sibling LARA module.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section class="doc-section" id="sec-2">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 02</span>
+          <h2>Core Features <em>Breakdown</em></h2>
+        </div>
+
+        <p>Each feature surface below is a tab inside a channel. Click any card to expand its specification — purpose, inputs, outputs, dependencies, and edge cases.</p>
+
+        <!-- Feature cards -->
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.1</span>
+              <span class="fc-name">Channels</span>
+              <span class="fc-sibling">workspace spine</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <div class="table-wrap"><table class="deftable">
+              <tr><td><strong>Purpose</strong></td><td>Persistent room scoped to a Project × Service Arm. Hosts all sub-tabs.</td></tr>
+              <tr><td><strong>User actions</strong></td><td>Open channel, switch tabs, open threads, archive, leave/join.</td></tr>
+              <tr><td><strong>System actions</strong></td><td>Resolve membership, last-activity sort, unread counts, tab visibility by <code>kind</code>.</td></tr>
+              <tr><td><strong>Inputs</strong></td><td><code>channelId</code>, <code>kind</code>, <code>projectId</code>, <code>serviceArmId</code>, membership list.</td></tr>
+              <tr><td><strong>Outputs</strong></td><td><code>ChannelBrief</code> + members + <code>dmCapability</code> for the header/strip.</td></tr>
+              <tr><td><strong>Dependencies</strong></td><td>Projects, Service Arms, Users, Auth.</td></tr>
+              <tr><td><strong>Permissions</strong></td><td>ACTIVE members read/write; non-members 404.</td></tr>
+              <tr><td><strong>Edge cases</strong></td><td>DM/THREAD channels are chat-only (no tabs). PRIVATE_THREAD includes a reduced tab set.</td></tr>
+              <tr><td><strong>Scalability notes</strong></td><td>Move tab-allowlist from client to server policy; cache <code>ChannelBrief</code> per session.</td></tr>
+            </table></div>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.2</span>
+              <span class="fc-name">Chat Tab</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Free-form messaging with message types (POST, UPDATE, DECISION, BLOCKER, NOTE, QUESTION, REMINDER, SYSTEM), threads, reactions, pins, convert-to-task/ticket.</li>
+              <li><strong>Inputs</strong>: message body, mentions, attachments, parent ID for threads.</li>
+              <li><strong>Outputs</strong>: <code>MessageDTO[]</code> for the timeline, <code>MessageThreadBrief</code> for the thread dropdown.</li>
+              <li><strong>Edge cases</strong>: edited / deleted messages, mention completion against ACTIVE members only.</li>
+              <li><strong>Future</strong>: server-side full-text search; live presence indicators via WebSocket instead of poll.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.3</span>
+              <span class="fc-name">Modules / Tasks</span>
+              <span class="fc-sibling">sibling: Pulse</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Per-project task board (List / Board / Calendar views, group by status/priority/assignee/dueBucket, custom fields, renameable labels).</li>
+              <li><strong>Inputs</strong>: <code>TaskDTO</code> (title, status, priority, assignees[], due/start, estimatedHours, customFields).</li>
+              <li><strong>Outputs</strong>: filtered/grouped views, status timeline, per-module thread channels.</li>
+              <li><strong>Dependencies</strong>: Modules config (<code>ModulesConfig</code>), channel members, project.</li>
+              <li><strong>Permissions</strong>: project members can create/edit; archived projects read-only.</li>
+              <li><strong>Edge cases</strong>: multi-assignee but <code>assignee</code> mirror kept for legacy views.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.4</span>
+              <span class="fc-name">Files / Markup</span>
+              <span class="fc-sibling">sibling: Markup</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Per-channel file shelf with previews, versioned uploads.</li>
+              <li><strong>Inputs</strong>: <code>FileDTO</code> (filename, mimeType, byteSize, version, uploadedBy).</li>
+              <li><strong>Outputs</strong>: gallery + version timeline; deep-link out to Markup module for annotation.</li>
+              <li><strong>Edge cases</strong>: DM channels block uploads by policy.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.5</span>
+              <span class="fc-name">Tickets / Resolve</span>
+              <span class="fc-sibling">sibling: Resolve</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Structured issue tracker — <code>BUG | RFI | COORDINATION | CHANGE_REQUEST | CLARIFICATION</code> × status × priority.</li>
+              <li><strong>Inputs</strong>: <code>TicketDTO</code> (code, kind, status, priority, reporter, assignee).</li>
+              <li><strong>Outputs</strong>: ticket list + per-ticket workflow.</li>
+              <li><strong>Edge cases</strong>: ticket <code>code</code> auto-generated per project namespace.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.6</span>
+              <span class="fc-name">Team / Pivot</span>
+              <span class="fc-sibling">sibling: Pivot</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Member roster with skills, presence, working hours, scheduled statuses.</li>
+              <li><strong>Inputs</strong>: <code>UserBrief</code> / <code>UserDetail</code>, project membership state (<code>ACTIVE</code> / etc.).</li>
+              <li><strong>Outputs</strong>: searchable roster + hover-card across the app.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.7</span>
+              <span class="fc-name">Insights / Lens</span>
+              <span class="fc-sibling">sibling: Lens</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Per-channel KPI snapshot for the last N days (default 14).</li>
+              <li><strong>Output shape</strong>: <code>ChannelInsights { messageCount, activeMemberCount, tasksOpen/Done, ticketsOpen/Resolved, filesCount, pinsCount, messagesPerDay[], topAuthors[] }</code>.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.8</span>
+              <span class="fc-name">Meetings / Meet</span>
+              <span class="fc-sibling">sibling: Meet</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Scheduled meetings, call history, paste-link import (Zoom/Meet/Teams), MOM note linkage. Upcoming meetings surface in the channel and in the global Calendar.</li>
+              <li><strong>Stores</strong>: <code>call-log-store.ts</code> (per-channel), <code>meetings-store.ts</code> (global, filtered by channel/user).</li>
+              <li><strong>Edge cases</strong>: missed-call badge in channel header bell, "Join" affordance ≤ 5 min before start.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.9</span>
+              <span class="fc-name">Notes</span>
+              <span class="fc-sibling">internal — no sibling module</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Per-channel notebook (sections × pages × sub-pages). Text pages back BlockNote; whiteboard is a P1 stub.</li>
+              <li><strong>Special</strong>: "Meeting" sections auto-link to MOM pages created from calls.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.10</span>
+              <span class="fc-name">Calendar</span>
+              <span class="fc-sibling">global surface</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: One unified upcoming-meetings view across all projects the user is in. Hosts the Schedule Meeting dialog with a Project picker (auto-filled when launched from a channel).</li>
+              <li><strong>Source</strong>: same <code>meetings-store.ts</code> consumed by per-channel Meet tabs.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.11</span>
+              <span class="fc-name">AI Tab</span>
+              <span class="fc-sibling">new · per channel</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <div class="table-wrap"><table class="deftable">
+              <tr><td><strong>Purpose</strong></td><td>PM-facing project assistant grounded in the channel's tasks, tickets, files, notebook, members, recent messages, insights.</td></tr>
+              <tr><td><strong>User actions</strong></td><td>Type / pick a suggested prompt, clear conversation.</td></tr>
+              <tr><td><strong>System actions</strong></td><td>Aggregate <code>ProjectAiContext</code>, route the prompt through a heuristic table, simulate latency, append assistant reply.</td></tr>
+              <tr><td><strong>Inputs</strong></td><td>Prompt string + live data from 6 react-query keys.</td></tr>
+              <tr><td><strong>Outputs</strong></td><td><code>AiChatMessage</code> appended to per-channel localStorage thread.</td></tr>
+              <tr><td><strong>Dependencies</strong></td><td><code>ai-engine.ts</code>, <code>ai-chat-store.ts</code>, all channel data queries.</td></tr>
+              <tr><td><strong>Permissions</strong></td><td>Visible only on <code>PROJECT_SERVICE_ARM</code> channels.</td></tr>
+              <tr><td><strong>Edge cases</strong></td><td>Falls back to summary when no route matches; thread cleared without touching project data.</td></tr>
+              <tr><td><strong>Future</strong></td><td>Swap heuristic router for real LLM (single-file change in <code>ai-engine.ts</code>); add embeddings over notebook pages and message history.</td></tr>
+            </table></div>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.12</span>
+              <span class="fc-name">Broadcast</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li><strong>Purpose</strong>: Org-wide / multi-channel announcements with delivery to selected channel set.</li>
+              <li><strong>Edge cases</strong>: high-priority broadcasts pin to the top of the recipient channels.</li>
+            </ul>
+          </div></div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header" onclick="toggleCard(this)">
+            <div class="feature-card-title">
+              <span class="fc-num">2.13</span>
+              <span class="fc-name">My Tasks / Reminders / Dashboard</span>
+            </div>
+            <span class="feature-card-toggle">+</span>
+          </div>
+          <div class="feature-card-body"><div class="feature-card-body-inner">
+            <ul>
+              <li>Personal cross-project surfaces aggregating data from all channels the user is ACTIVE on.</li>
+            </ul>
+          </div></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section class="doc-section" id="sec-3">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 03</span>
+          <h2>User Roles &amp; <em>Permissions</em></h2>
+        </div>
+
+        <h3><span class="h3-num">3.1</span>Built-in roles</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Role</th><th>Scope</th><th>Typical capabilities</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Workspace Admin</strong></td><td>Org</td><td>Create/archive projects, manage departments, manage members, billing categories, broadcast org-wide.</td></tr>
+              <tr><td><strong>Project Manager</strong></td><td>Project</td><td>Create channels, manage Modules config, invite/remove members, set custom fields, run broadcasts to project.</td></tr>
+              <tr><td><strong>Team Member</strong></td><td>Project</td><td>Read all channels they're ACTIVE on, post messages, create/own tasks &amp; tickets, upload files, edit own notes, ask AI.</td></tr>
+              <tr><td><strong>Client / Guest</strong></td><td>Project (restricted arms)</td><td>Read-only on assigned channels (e.g. Architecture review), comment on tickets they reported, view shared files.</td></tr>
+              <tr><td><strong>Bot / System</strong></td><td>Channel</td><td>Posts <code>SYSTEM</code> messages (call started, task completed) — no human auth.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3><span class="h3-num">3.2</span>Access control matrix <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; margin-left: 0.5rem;">(click role to highlight column)</span></h3>
+
+        <div class="table-wrap">
+          <table class="matrix-interactive" id="perm-matrix">
+            <thead>
+              <tr>
+                <th style="text-align:left">Capability</th>
+                <th class="role-col" data-role="admin">Admin</th>
+                <th class="role-col" data-role="pm">PM</th>
+                <th class="role-col" data-role="member">Member</th>
+                <th class="role-col" data-role="client">Client</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Create project</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-maybe">⚠ if delegated</td><td data-col="member" class="perm-no">❌</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>Create channel</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-no">❌</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>Post message</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-maybe">✅ (own channels)</td></tr>
+              <tr><td>Create task / ticket</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-maybe">⚠ tickets only</td></tr>
+              <tr><td>Edit Modules config</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-no">❌</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>Upload file</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-maybe">⚠ if arm allows</td></tr>
+              <tr><td>Schedule meeting</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>View Insights</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>Use AI tab</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-yes">✅</td><td data-col="member" class="perm-yes">✅</td><td data-col="client" class="perm-no">❌ (default)</td></tr>
+              <tr><td>Broadcast</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-maybe">✅ (project scope)</td><td data-col="member" class="perm-no">❌</td><td data-col="client" class="perm-no">❌</td></tr>
+              <tr><td>Archive / delete project</td><td data-col="admin" class="perm-yes">✅</td><td data-col="pm" class="perm-no">❌</td><td data-col="member" class="perm-no">❌</td><td data-col="client" class="perm-no">❌</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <blockquote>Membership <em>state</em> (<code>ACTIVE | INVITED | REMOVED | LEFT</code>) further gates write actions; only ACTIVE members can be @-mentioned or assigned.</blockquote>
+      </div>
+    </section>
+
+    <!-- SECTION 4 -->
+    <section class="doc-section" id="sec-4">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 04</span>
+          <h2>Complete <em>User Flow</em></h2>
+        </div>
+
+        <div class="flow-toggle" id="flow-toggle">
+          <button class="active" data-pane="auth">Auth</button>
+          <button data-pane="nav">Navigation</button>
+          <button data-pane="feat">Feature</button>
+          <button data-pane="err">Errors</button>
+        </div>
+
+        <div class="flow-pane active" data-pane="auth">
+          <h3><span class="h3-num">4.1</span>Authentication flow</h3>
+          <pre class="ascii-diagram">Login page  ── POST /auth/login ──▶  Session token + UserDetail
+       │
+       ▼
+useAuthStore (zustand) ← writes user, presence
+       │
+       ▼
+AuthedRoute guard ──┬── if no user → redirect /login
+                    └── if user   → mount sidebar + content</pre>
+          <ul>
+            <li>Single mock endpoint today; production target is SSO (Okta / Azure AD) + email/password fallback.</li>
+            <li>Session restored from <code>localStorage('lara-connect:auth')</code> on reload.</li>
+          </ul>
+        </div>
+
+        <div class="flow-pane" data-pane="nav">
+          <h3><span class="h3-num">4.2</span>Navigation flow</h3>
+          <pre class="ascii-diagram">Sidebar
+ ├─ Dashboard
+ ├─ My tasks            (cross-project tasks assigned to me)
+ ├─ Reminders
+ ├─ Broadcast           (compose + history)
+ ├─ Calendar            (NEW — global upcoming meetings)
+ └─ PROJECTS
+      ├─ AVN-RES
+      │    ├─ arch  ◀── channel = /c/ch-avn-arch
+      │    ├─ mep
+      │    └─ struct
+      └─ BHC-MED · …</pre>
+        </div>
+
+        <div class="flow-pane" data-pane="feat">
+          <h3><span class="h3-num">4.3</span>Feature interaction (per channel)</h3>
+          <pre class="ascii-diagram">ChannelPage
+ ├─ ChannelHeader (project + arm + members + bell)
+ ├─ TabStrip   chat ▸ tasks ▸ files ▸ tickets ▸ team ▸ insights ▸ meetings ▸ notes ▸ AI
+ └─ Tab body (lazy-mounted by route)
+        + optional ThreadPanel / ThreadPane on the right</pre>
+          <ul>
+            <li>All tabs share the same <code>['channel', id]</code> react-query cache for <code>ChannelBrief</code>.</li>
+            <li>URL is the source of truth (<code>/c/:channelId/:tab?thread=…&amp;message=…&amp;page=…</code>).</li>
+          </ul>
+        </div>
+
+        <div class="flow-pane" data-pane="err">
+          <h3><span class="h3-num">4.4</span>Error-handling flow</h3>
+          <ul>
+            <li>API layer (<code>api.ts</code>) throws on non-2xx → react-query surfaces <code>isError</code> → tab renders an inline error card ("Couldn't load this …").</li>
+            <li>Form-level validation in dialogs (<code>ScheduleMeetingDialog</code>, <code>NewTaskDialog</code>, etc.) blocks submit on missing required fields.</li>
+            <li>A top-level error boundary catches React render exceptions and shows a "Something went wrong" panel with reload affordance (already proven in dev for the AI tab infinite-loop fix).</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION 5 -->
+    <section class="doc-section" id="sec-5">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 05</span>
+          <h2>Data <em>Flow</em> Documentation</h2>
+        </div>
+
+        <h3><span class="h3-num">5.1</span>Source → Storage map (current prototype)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Domain</th><th>Source</th><th>Cache</th><th>Persistence</th></tr></thead>
+            <tbody>
+              <tr><td>Channels / Projects / Users</td><td>Mock <code>api.ts</code> (in-memory fixtures)</td><td>react-query (<code>['channels']</code>, <code>['channel', id]</code>, …)</td><td>None (regenerated each session)</td></tr>
+              <tr><td>Messages</td><td><code>POST /channels/:id/messages</code></td><td><code>['messages', channelId]</code></td><td>In-memory + localStorage (session store)</td></tr>
+              <tr><td>Tasks / Tickets / Files</td><td>Mock API endpoints</td><td>per-channel react-query keys</td><td>In-memory</td></tr>
+              <tr><td>Notebook</td><td><code>GET/PATCH /channels/:id/notebook</code></td><td><code>['notebook', channelId]</code></td><td>In-memory</td></tr>
+              <tr><td>Insights</td><td><code>GET /channels/:id/insights</code></td><td><code>['insights', 'channel', id]</code></td><td>computed on-read</td></tr>
+              <tr><td>Calls</td><td><code>call-log-store.ts</code></td><td>own observer set</td><td><code>localStorage:lara-connect:calls:&lt;channelId&gt;</code></td></tr>
+              <tr><td>Meetings</td><td><code>meetings-store.ts</code></td><td>own observer set</td><td><code>localStorage:lara-connect:meetings:v1</code></td></tr>
+              <tr><td>AI chats</td><td><code>ai-chat-store.ts</code></td><td>own observer set</td><td><code>localStorage:lara-connect:ai-chat:&lt;channelId&gt;</code></td></tr>
+              <tr><td>Auth</td><td><code>useAuthStore</code> (zustand)</td><td>in-memory</td><td><code>localStorage:lara-connect:auth</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3><span class="h3-num">5.2</span>Cross-module movement</h3>
+        <pre class="ascii-diagram">                            ┌───────────────────┐
+                            │  Channel timeline │
+                            │  (messages)       │
+                            └─────────┬─────────┘
+                          convert-to-task / ticket
+                                      ▼
+       ┌────────────┐         ┌───────────────┐         ┌────────────┐
+       │  Tasks     │◀────────│ Channel scope │────────▶│  Tickets   │
+       └─────┬──────┘         └───────┬───────┘         └─────┬──────┘
+             │                        │                       │
+             │ aggregated by          │ aggregated by         │
+             ▼                        ▼                       ▼
+       ┌────────────┐         ┌───────────────┐         ┌────────────┐
+       │  Insights  │◀────────│  AI engine    │────────▶│  Notebook  │
+       │  (Lens)    │         │  context blob │         │  (MOM)     │
+       └────────────┘         └───────┬───────┘         └────────────┘
+                                      │
+                                      ▼
+                            ┌───────────────────┐
+                            │  AI Tab response  │
+                            └───────────────────┘</pre>
+
+        <h3><span class="h3-num">5.3</span>Real-time updates</h3>
+        <ul>
+          <li>Today: optimistic mutation + <code>queryClient.invalidateQueries</code>. No socket.</li>
+          <li>Future: WebSocket channel per <code>channelId</code> for <code>message.created</code>, <code>task.updated</code>, <code>member.presence</code>, <code>call.started</code>.</li>
+        </ul>
+
+        <h3><span class="h3-num">5.4</span>File handling flow</h3>
+        <pre class="ascii-diagram">User picks file ─▶ presigned PUT to object store (target)
+                ─▶ POST /channels/:id/files with metadata
+                ─▶ server thumbnails + virus scan (target)
+                ─▶ react-query invalidate ['files', channelId]
+                ─▶ Markup module deep-link for annotation</pre>
+        <p>Current prototype: data-URL previews, no real upload.</p>
+
+        <h3><span class="h3-num">5.5</span>AI processing flow (per channel)</h3>
+        <pre class="ascii-diagram">User prompt
+   │
+   ▼
+AiTab assembles ProjectAiContext from 6 live queries
+   │     (channel, members, insights, tasks, tickets, files, notebook, recentMessages)
+   ▼
+ai-engine.runAiQuery(prompt, ctx)
+   │
+   ├─ regex route table → topical builder (summary | blockers | risks | …)
+   └─ fallback → buildSummary(ctx)
+   │
+   ▼
+appendAiMessage(assistant) → localStorage → observer → AiTab re-renders</pre>
+
+        <h3><span class="h3-num">5.6</span>Notifications &amp; triggers</h3>
+        <ul>
+          <li>Bell badge in channel header: unread messages + missed calls.</li>
+          <li>Reminders queue (<code>GET /reminders</code>) drives the global Reminders panel.</li>
+          <li>Scheduled meeting reminders surface in the Calendar and as Inbox entries.</li>
+          <li>Broadcasts fan out to selected channels as pinned <code>SYSTEM</code> messages.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SECTION 6 -->
+    <section class="doc-section" id="sec-6">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 06</span>
+          <h2>System <em>Architecture</em> Overview</h2>
+        </div>
+
+        <div class="flow-toggle" id="arch-toggle">
+          <button class="active" data-pane="proto">Current (prototype)</button>
+          <button data-pane="target">Target (production)</button>
+        </div>
+
+        <div class="flow-pane active" data-pane="proto">
+          <h3><span class="h3-num">6.1</span>Current (prototype)</h3>
+          <pre class="ascii-diagram">┌──────────────────────────────────────────────────────────┐
+│  Browser (single page)                                   │
+│  Vite + React 18 + TS + TailwindCSS                      │
+│  @tanstack/react-router · react-query · zustand          │
+│  ├─ src/features/* (channel, calendar, notes, ai, …)     │
+│  ├─ src/components/ui & layout                           │
+│  └─ src/lib/api.ts  ── handles ALL requests in-memory    │
+│           localStorage stores (calls, meetings, ai-chat, │
+│           auth, notification prefs, modules config)      │
+└──────────────────────────────────────────────────────────┘</pre>
+        </div>
+
+        <div class="flow-pane" data-pane="target">
+          <h3><span class="h3-num">6.2</span>Target (production)</h3>
+          <pre class="ascii-diagram">                ┌─────────────────────────┐
+   Browser ───▶ │  CDN + Static SPA       │
+                └────────────┬────────────┘
+                             │ HTTPS · JWT/SSO
+                             ▼
+                ┌─────────────────────────┐         ┌──────────────┐
+                │  API Gateway (REST+WS)  │◀───────▶│  Auth (Okta) │
+                └────────────┬────────────┘         └──────────────┘
+                             │
+        ┌────────────────────┼────────────────────────────────┐
+        ▼                    ▼                                ▼
+  ┌───────────┐       ┌────────────┐                  ┌──────────────┐
+  │ Channels  │       │ Tasks /    │                  │ AI Service   │
+  │ Messaging │       │ Tickets /  │                  │ (LLM + RAG)  │
+  │ Notes     │       │ Files /    │                  │  embeddings  │
+  └─────┬─────┘       │ Meetings   │                  └──────┬───────┘
+        │             └──────┬─────┘                         │
+        ▼                    ▼                               ▼
+┌──────────────┐      ┌───────────────┐               ┌──────────────┐
+│ Postgres     │      │ Object storage│               │ Vector DB    │
+│ (primary)    │      │ (S3 / GCS)    │               │ (pgvector)   │
+└─────┬────────┘      └───────────────┘               └──────────────┘
+      │
+      ▼
+┌──────────────┐
+│ Redis        │ ── presence, queues, pub/sub for WS
+└──────────────┘</pre>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Layer</th><th>Tech</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Frontend</strong></td><td>Vite + React 18 + TS + TailwindCSS, react-router, react-query, zustand</td></tr>
+                <tr><td><strong>Backend (target)</strong></td><td>Node.js (NestJS) or Go service, REST + WebSocket gateway</td></tr>
+                <tr><td><strong>Database</strong></td><td>PostgreSQL primary, Redis for cache + pub/sub</td></tr>
+                <tr><td><strong>Object storage</strong></td><td>S3 / GCS with presigned URLs</td></tr>
+                <tr><td><strong>Authentication</strong></td><td>SSO via Okta / Entra ID, JWT for API, refresh tokens</td></tr>
+                <tr><td><strong>AI</strong></td><td>LLM (Anthropic Claude) with tool-use; pgvector for embeddings over notebook + messages</td></tr>
+                <tr><td><strong>Queues</strong></td><td>Redis Streams or NATS for email/notification fan-out and scheduled jobs</td></tr>
+                <tr><td><strong>Observability</strong></td><td>OpenTelemetry → Grafana / Datadog, Sentry for client errors</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7 -->
+    <section class="doc-section" id="sec-7">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 07</span>
+          <h2>Database / <em>Entity Structure</em></h2>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Entity</th><th>Key fields</th><th>Relationships</th><th>CRUD owners</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Project</strong></td><td>id, code, name, status, phase, clientName, startedAt, targetEndAt</td><td>has many: ServiceArm, Channel, ProjectMembership, Task, Ticket, File</td><td>Admin, PM</td></tr>
+              <tr><td><strong>ServiceArm</strong></td><td>id, code, name, department</td><td>belongs to Project</td><td>Admin</td></tr>
+              <tr><td><strong>Channel</strong></td><td>id, name, kind, projectId, serviceArmId, parentChannelId, archived</td><td>has many: Message, File, Task, Ticket, Notebook</td><td>PM</td></tr>
+              <tr><td><strong>ChannelMembership</strong></td><td>userId, channelId, state</td><td>between User × Channel</td><td>PM</td></tr>
+              <tr><td><strong>User</strong></td><td>id, displayName, email, avatarUrl, presence, workingHours, skills[]</td><td>has many: Project memberships</td><td>Admin / self</td></tr>
+              <tr><td><strong>Message</strong></td><td>id, channelId, authorId, body, type, parentId, createdAt, editedAt, deletedAt</td><td>belongs to Channel; self-ref for threads</td><td>Author + Admin</td></tr>
+              <tr><td><strong>Task</strong></td><td>id, projectId, channelId?, title, status, priority, assignees[], dueAt, customFields</td><td>belongs to Project</td><td>Creator + assignees + PM</td></tr>
+              <tr><td><strong>Ticket</strong></td><td>id, projectId, channelId?, code, kind, status, priority, reporter, assignee</td><td>belongs to Project</td><td>Reporter, assignee, PM</td></tr>
+              <tr><td><strong>File</strong></td><td>id, channelId, filename, mimeType, version, uploadedById</td><td>belongs to Channel</td><td>Uploader + PM</td></tr>
+              <tr><td><strong>Notebook</strong></td><td>channelId, sections[], pages{id→Page}</td><td>one per Channel</td><td>Channel members</td></tr>
+              <tr><td><strong>NotebookPage</strong></td><td>id, type, title, content, parentId?, childPageIds[]</td><td>belongs to Notebook</td><td>Last editor recorded</td></tr>
+              <tr><td><strong>Meeting</strong></td><td>id, projectId?, channelId?, title, startAt, durationMin, link, participants[]</td><td>optional Channel/Project</td><td>Creator</td></tr>
+              <tr><td><strong>CallLogEntry</strong></td><td>id, channelId, kind, startedAt, endedAt, participants[], momPageId?</td><td>belongs to Channel</td><td>Participants</td></tr>
+              <tr><td><strong>AiChatMessage</strong></td><td>id, channelId, role, body, createdAt</td><td>per-User × Channel (local)</td><td>Self only</td></tr>
+              <tr><td><strong>Broadcast</strong></td><td>id, authorId, body, targetChannelIds[], priority</td><td>many-to-many with Channel</td><td>Admin / PM</td></tr>
+              <tr><td><strong>Reminder</strong></td><td>id, userId, body, dueAt, completed, channelId?</td><td>belongs to User</td><td>Self</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 8 -->
+    <section class="doc-section" id="sec-8">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 08</span>
+          <h2>API <em>Structure</em></h2>
+        </div>
+
+        <h3><span class="h3-num">8.1</span>Conventions</h3>
+        <ul>
+          <li>Base: <code>/api/v1</code></li>
+          <li>Auth: <code>Authorization: Bearer &lt;jwt&gt;</code> (today: client-side mocked)</li>
+          <li>Errors: <code>{ code, message, details? }</code> with HTTP-aligned status</li>
+          <li>Pagination: <code>?limit=&amp;cursor=</code></li>
+          <li>Idempotency: <code>Idempotency-Key</code> header on POST mutations</li>
+        </ul>
+
+        <h3><span class="h3-num">8.2</span>Endpoint surface (already wired in the mock)</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Method · Path</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><span class="method post">POST</span><code>/auth/login</code></td><td>Issue session</td></tr>
+              <tr><td><span class="method">GET</span><code>/me</code> · <span class="method patch">PATCH</span><code>/me</code></td><td>Profile, presence, working hours</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels</code> · <span class="method">GET</span><code>/channels/:id</code></td><td>Channel list + detail</td></tr>
+              <tr><td><span class="method post">POST</span><code>/channels/dm</code></td><td>Create or resume DM</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/messages</code> · <span class="method post">POST</span><code>…/messages</code></td><td>Timeline</td></tr>
+              <tr><td><span class="method post">POST</span><code>/channels/:id/read</code></td><td>Mark read</td></tr>
+              <tr><td><span class="method post">POST</span><code>/messages/:id/reactions</code> · <code>…/pin</code> · <span class="method patch">PATCH</span><code>…/type</code></td><td>Message ops</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/tasks</code> · <span class="method post">POST</span><code>/tasks</code> · <span class="method patch">PATCH</span><code>/tasks/:id</code></td><td>Modules / Pulse</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/tickets</code> · <span class="method post">POST</span><code>/tickets</code></td><td>Resolve</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/files</code> · <span class="method post">POST</span><code>/channels/:id/files</code></td><td>Markup</td></tr>
+              <tr><td><span class="method">GET</span><span class="method patch">PATCH</span><code>/channels/:id/notebook</code> · <span class="method">GET</span><code>…/notebook/activity</code></td><td>Notes</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/insights</code></td><td>Lens</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/module-threads</code> · <span class="method post">POST</span><code>…/module-threads</code></td><td>Per-module side conversations</td></tr>
+              <tr><td><span class="method">GET</span><code>/channels/:id/message-threads</code></td><td>Threads the user joined</td></tr>
+              <tr><td><span class="method">GET</span><code>/me/dms</code> · <span class="method">GET</span><code>/me/tasks</code> · <span class="method">GET</span><code>/me/inbox</code></td><td>Personal aggregates</td></tr>
+              <tr><td><span class="method">GET</span><code>/me/scheduled-statuses</code> · <span class="method post">POST</span><code>…</code> · <span class="method delete">DELETE</span><code>…/:id</code> · <span class="method post">POST</span><code>…/tick</code></td><td>Scheduled statuses</td></tr>
+              <tr><td><span class="method">GET</span><span class="method patch">PATCH</span><code>/me/notification-prefs</code></td><td>Notifications</td></tr>
+              <tr><td><span class="method post">POST</span><code>/broadcasts</code></td><td>Broadcast fan-out</td></tr>
+              <tr><td><span class="method">GET</span><code>/reminders</code> · <span class="method post">POST</span><code>/reminders/:id/complete</code></td><td>Reminders</td></tr>
+              <tr><td><span class="method">GET</span><code>/search?…</code></td><td>Cross-channel search</td></tr>
+              <tr><td><span class="method">GET</span><code>/workspace/projects</code> · <span class="method">GET</span><code>/workspace/projects/:id</code> · <span class="method patch">PATCH</span><code>/projects/:id/members/:userId</code></td><td>Workspace</td></tr>
+              <tr><td><span class="method">GET</span><code>/presence</code></td><td>Bulk presence snapshot</td></tr>
+              <tr><td><span class="method">GET</span><code>/users/:id</code></td><td>User detail / hover-card</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3><span class="h3-num">8.3</span>Example — schedule meeting</h3>
+        <pre data-label="Request">POST /api/v1/meetings
+Content-Type: application/json
+Authorization: Bearer &lt;jwt&gt;
+
+{
+  "title":     "Weekly arch review",
+  "projectId": "proj-avn-res",
+  "channelId": "ch-avn-arch",
+  "startAt":   "2026-05-19T14:00:00Z",
+  "durationMin": 45,
+  "participantIds": ["usr-1","usr-2","usr-3"],
+  "link": null
+}</pre>
+
+        <p>Response <code>201</code>:</p>
+        <pre data-label="Response">{
+  "id": "mtg-...",
+  "title": "Weekly arch review",
+  "projectId": "proj-avn-res",
+  "channelId": "ch-avn-arch",
+  "startAt": "2026-05-19T14:00:00Z",
+  "durationMin": 45,
+  "participants": [{ "id": "usr-1", "displayName": "…" }],
+  "link": "https://meet.lara.app/join/…",
+  "createdBy": "usr-7"
+}</pre>
+
+        <h3><span class="h3-num">8.4</span>AI endpoint (target shape)</h3>
+        <pre data-label="AI Chat">POST /api/v1/ai/chat
+{
+  "channelId": "ch-avn-arch",
+  "prompt": "What is blocked or overdue?",
+  "history": [{ "role": "user", "body": "..." }, ...]
+}
+→ 200
+{
+  "reply": "Here is what is in the way:\n• …",
+  "citations": [{ "kind": "task", "id": "tsk-…" }, …]
+}</pre>
+      </div>
+    </section>
+
+    <!-- SECTION 9 -->
+    <section class="doc-section" id="sec-9">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 09</span>
+          <h2>AI <em>Features</em></h2>
+        </div>
+
+        <h3><span class="h3-num">9.1</span>Context flow (today)</h3>
+        <p><code>AiTab</code> aggregates the 6 live react-queries into a <code>ProjectAiContext</code>:</p>
+        <pre data-label="Context blob">ProjectAiContext {
+  channel, members, insights,
+  tasks, tickets, files, notebook,
+  recentMessages
+}</pre>
+        <p>This blob is handed to <code>runAiQuery(prompt, ctx)</code>. A regex route table maps the prompt to a topical builder: <strong>summary · blockers · overdue · risks · who-needs-help · upcoming · people · notes</strong>. Each builder consumes only the slices it needs and emits a Markdown-ish string.</p>
+
+        <h3><span class="h3-num">9.2</span>Memory handling</h3>
+        <ul>
+          <li>Per-channel thread is local-only (<code>localStorage:lara-connect:ai-chat:&lt;channelId&gt;</code>).</li>
+          <li>No cross-channel memory. No PII leaves the browser.</li>
+          <li>"Clear" wipes the thread without touching project data.</li>
+        </ul>
+
+        <h3><span class="h3-num">9.3</span>Production AI pipeline (target)</h3>
+        <pre class="ascii-diagram">prompt + (channelId, projectId)
+   │
+   ▼
+Context Builder service
+   ├─ Pulls live records (tasks, tickets, members)
+   ├─ Retrieves top-k vectors from pgvector
+   │      (notebook chunks + recent messages, embedded nightly)
+   └─ Trims to model token budget
+   │
+   ▼
+LLM call (Claude) with tool-use:
+   ├─ get_tasks(filter)        ─┐
+   ├─ get_tickets(filter)       ├─ data tools
+   ├─ get_messages(query)       │
+   ├─ get_notebook_page(id)    ─┘
+   ├─ create_task(...)          ─┐
+   ├─ post_message(...)          ├─ action tools (require confirm)
+   └─ schedule_meeting(...)     ─┘
+   │
+   ▼
+Reply (with citations) → streamed to UI</pre>
+
+        <h3><span class="h3-num">9.4</span>Security &amp; privacy</h3>
+        <ul>
+          <li>Tenant isolation in retrieval — every embedding row has <code>projectId</code> and is filtered before the LLM ever sees it.</li>
+          <li>Action tools require explicit user confirmation in chat before execution (no auto-write).</li>
+          <li>Audit log entry per AI tool call (caller, tool, args, project).</li>
+          <li>Opt-out toggle per project for data use beyond the live request.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SECTION 10 -->
+    <section class="doc-section" id="sec-10">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 10</span>
+          <h2>Notifications &amp; <em>Automation</em></h2>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Channel</th><th>Mechanism</th><th>Trigger examples</th></tr></thead>
+            <tbody>
+              <tr><td><strong>In-app bell</strong></td><td>Channel header + sidebar pip</td><td>New message, mention, missed call, assigned task</td></tr>
+              <tr><td><strong>Inbox</strong></td><td>Aggregated <code>GET /me/inbox</code></td><td>Mentions, broadcasts, reminders due</td></tr>
+              <tr><td><strong>Email</strong></td><td>Templated transactional (target)</td><td>Mention while offline, daily digest, missed call</td></tr>
+              <tr><td><strong>Push</strong></td><td>Web push / mobile (future)</td><td>DMs, critical broadcasts</td></tr>
+              <tr><td><strong>Scheduled jobs</strong></td><td>Cron / worker</td><td>Insights window roll-up, reminder firing, missed-call cleanup, daily digest</td></tr>
+              <tr><td><strong>Webhooks</strong> (future)</td><td>Outgoing to client systems</td><td><code>task.completed</code>, <code>ticket.resolved</code>, <code>meeting.scheduled</code></td></tr>
+              <tr><td><strong>Automation rules</strong> (future)</td><td>User-defined</td><td>"When task status → BLOCKED, post to channel + email PM"</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>User preferences live in <code>GET/PATCH /me/notification-prefs</code> — per category × per channel.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 11 -->
+    <section class="doc-section" id="sec-11">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 11</span>
+          <h2>Security &amp; <em>Compliance</em></h2>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Area</th><th>Approach</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Authentication</strong></td><td>Today: mocked session. Target: SSO (SAML/OIDC) primary + JWT, refresh-token rotation.</td></tr>
+              <tr><td><strong>Authorization</strong></td><td>Server-enforced membership + role; client filters are convenience only. Channel <code>kind</code> controls tab availability.</td></tr>
+              <tr><td><strong>Encryption</strong></td><td>TLS 1.2+ in transit. AES-256 at rest for DB, KMS-managed envelope encryption for object storage.</td></tr>
+              <tr><td><strong>Audit logs</strong></td><td>Append-only log of admin actions, AI tool calls, file accesses.</td></tr>
+              <tr><td><strong>File security</strong></td><td>Presigned, time-limited URLs. Virus scan on upload. MIME allow-list.</td></tr>
+              <tr><td><strong>Access restrictions</strong></td><td>Client/guest users restricted to specific Service Arms within a Project.</td></tr>
+              <tr><td><strong>Rate limiting</strong></td><td>Per-user &amp; per-IP at the gateway, especially <code>/ai/chat</code> and <code>/messages</code>.</td></tr>
+              <tr><td><strong>Secrets</strong></td><td>Vaulted (HashiCorp Vault / cloud KMS), never in env files committed to repo.</td></tr>
+              <tr><td><strong>Compliance</strong></td><td>SOC 2-ready posture; GDPR data-subject endpoints (export/delete) for <code>User</code> and derivatives.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 12 -->
+    <section class="doc-section" id="sec-12">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 12</span>
+          <h2>Scalability &amp; <em>Future Expansion</em></h2>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Area</th><th>Concern</th><th>Suggested direction</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Read fan-out on channel timelines</strong></td><td>Hot channels return thousands of messages</td><td>Cursor pagination + edge cache; pre-compute "since last seen".</td></tr>
+              <tr><td><strong>Insights computation</strong></td><td>KPI recompute per request</td><td>Materialised view refreshed by background job.</td></tr>
+              <tr><td><strong>AI cost</strong></td><td>LLM tokens scale with project size</td><td>Pre-compute embeddings, RAG with top-k, distil long-running summaries nightly.</td></tr>
+              <tr><td><strong>WebSocket capacity</strong></td><td>Connection-per-user across many channels</td><td>Multiplex via a single user socket; pub/sub on Redis.</td></tr>
+              <tr><td><strong>Multi-tenant</strong></td><td>Today's mock is single workspace</td><td>Add <code>tenantId</code> to every row; row-level security in Postgres; per-tenant KMS keys.</td></tr>
+              <tr><td><strong>Mobile</strong></td><td>None yet</td><td>React Native shell reusing API + push.</td></tr>
+              <tr><td><strong>Offline</strong></td><td>Drafts only via localStorage</td><td>Service Worker + IndexedDB queue for messages/tasks.</td></tr>
+              <tr><td><strong>Enterprise readiness</strong></td><td colspan="2">SSO + SCIM + DLP integration; audit export; configurable data residency.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 13 -->
+    <section class="doc-section" id="sec-13">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 13</span>
+          <h2>Risks &amp; <em>Technical Concerns</em></h2>
+        </div>
+
+        <div class="table-wrap">
+          <table class="risk-table">
+            <thead><tr><th>Risk</th><th>Severity</th><th>Notes / Mitigation</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Mock API masks real latency &amp; error paths</strong></td><td><span class="severity sev-high"><span class="severity-dot"></span>High</span></td><td>Stand up a real backend mirroring the existing endpoint surface; add error/latency simulation in dev.</td></tr>
+              <tr><td><strong>localStorage stores can be cleared / spoofed</strong></td><td><span class="severity sev-medium"><span class="severity-dot"></span>Medium</span></td><td>Calls, meetings, AI threads are prototype-only; move to server before launch.</td></tr>
+              <tr><td><strong><code>useState</code> lazy-initializer + parent re-mount foot-gun</strong></td><td><span class="severity sev-medium"><span class="severity-dot"></span>Medium (recurring)</span></td><td>Encountered with <code>ScheduleMeetingDialog</code> &amp; AI subscription; standard pattern: conditional-mount or <code>useSyncExternalStore</code> with cached snapshot.</td></tr>
+              <tr><td><strong>Client-side permission filters</strong></td><td><span class="severity sev-high"><span class="severity-dot"></span>High</span></td><td>Always re-enforce on server; never trust the tab allowlist or member filter from the browser.</td></tr>
+              <tr><td><strong>AI hallucination on partial context</strong></td><td><span class="severity sev-medium"><span class="severity-dot"></span>Medium</span></td><td>Cite source records, refuse to invent task IDs; show "I don't have data for X" instead of fabricating.</td></tr>
+              <tr><td><strong>No rate limiting today</strong></td><td><span class="severity sev-medium"><span class="severity-dot"></span>Medium</span></td><td>Add at gateway before opening AI tab to clients.</td></tr>
+              <tr><td><strong>No real virus scan / DLP on files</strong></td><td><span class="severity sev-high"><span class="severity-dot"></span>High</span></td><td>Block uploads until scanner + MIME whitelist are wired.</td></tr>
+              <tr><td><strong>Mention completion + assignee lists rely on full membership in memory</strong></td><td><span class="severity sev-low"><span class="severity-dot"></span>Low</span></td><td>Switch to server-side typeahead beyond N members.</td></tr>
+              <tr><td><strong>Recurring meetings not modelled</strong></td><td><span class="severity sev-low"><span class="severity-dot"></span>Low</span></td><td>Add RRULE field to <code>Meeting</code> entity.</td></tr>
+              <tr><td><strong>Search is naive <code>?q=</code></strong></td><td><span class="severity sev-medium"><span class="severity-dot"></span>Medium</span></td><td>Move to OpenSearch/Meilisearch with per-tenant index.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 14 -->
+    <section class="doc-section" id="sec-14">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-num">§ 14</span>
+          <h2>Final <em>Summary</em></h2>
+        </div>
+
+        <p><strong>LARA Connect</strong> is a well-shaped prototype of a project collaboration platform purpose-built for AEC workflows. The information model (Project → Service Arm → Channel → Tabs) is coherent, the per-channel tab pattern keeps cognitive load low, and the recent additions — global Calendar, AI per channel — extend it without breaking that mental model.</p>
+
+        <div class="summary-grid">
+          <div class="summary-card strength">
+            <h4>Strengths</h4>
+            <ul>
+              <li>Clean separation between feature surfaces (<code>src/features/*</code>) and shared primitives (<code>src/lib</code>, <code>src/components</code>).</li>
+              <li>Consistent state pattern (react-query for server state, zustand for auth, localStorage observer stores for client-only domains).</li>
+              <li>Deep links into sibling LARA modules give Connect a genuine "hub" role.</li>
+              <li>New AI tab is grounded in real channel data, persists locally, and is architected so the heuristic engine can be swapped for an LLM in one file.</li>
+            </ul>
+          </div>
+          <div class="summary-card weakness">
+            <h4>Weaknesses</h4>
+            <ul>
+              <li>No real backend yet — <code>api.ts</code> is the only contract.</li>
+              <li>Permissions are still descriptive; server-enforced RBAC is the missing pillar.</li>
+              <li>No realtime layer; live presence and message arrival are mocked.</li>
+              <li>AI is heuristic; no embeddings, no citations.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Recommended next steps <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; margin-left: 0.5rem;">(highest leverage first)</span></h3>
+        <ol>
+          <li>Stand up a thin real backend (Postgres + Node/Go) implementing the existing endpoint surface 1:1.</li>
+          <li>Add JWT auth + server-side RBAC; remove client-side trust.</li>
+          <li>Introduce a WebSocket gateway for messages, presence, call signalling.</li>
+          <li>Replace the AI heuristic with a Claude tool-use pipeline + pgvector RAG, keep the same <code>runAiQuery</code> signature.</li>
+          <li>Move call/meeting/AI stores from localStorage to server, keep observers as the abstraction layer.</li>
+          <li>Add automated test coverage (Playwright) for the per-channel tab matrix and the AI router.</li>
+          <li>Begin multi-tenant hardening: <code>tenantId</code> everywhere, row-level security, KMS per tenant.</li>
+        </ol>
+
+        <blockquote>Document scope: code base at <code>repo/UI</code> as of 2026-05-18, including the Calendar feature and the per-channel AI tab landed in this session. Anything beyond the existing endpoint surface in <code>src/lib/api.ts</code> is labelled "target" / "future".</blockquote>
+      </div>
+    </section>
+
+    <footer>
+      LARA Connect · Internal Reference · v0.1 · 2026-05-18
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // ========== Feature card toggle ==========
+  function toggleCard(header) {
+    const card = header.parentElement;
+    card.classList.toggle('open');
+  }
+
+  // ========== TOC active state on scroll ==========
+  const tocLinks = document.querySelectorAll('.toc-list a');
+  const sections = document.querySelectorAll('section.doc-section');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        tocLinks.forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  // ========== Flow toggle (sections 4 & 6) ==========
+  function wireToggle(toggleId) {
+    const toggle = document.getElementById(toggleId);
+    if (!toggle) return;
+    const container = toggle.parentElement;
+    const buttons = toggle.querySelectorAll('button');
+    const panes = container.querySelectorAll('.flow-pane');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.pane;
+        buttons.forEach(b => b.classList.toggle('active', b === btn));
+        panes.forEach(p => p.classList.toggle('active', p.dataset.pane === target));
+      });
+    });
+  }
+  wireToggle('flow-toggle');
+  wireToggle('arch-toggle');
+
+  // ========== Permission matrix highlight ==========
+  const matrix = document.getElementById('perm-matrix');
+  if (matrix) {
+    const roleHeaders = matrix.querySelectorAll('th.role-col');
+    roleHeaders.forEach(th => {
+      th.addEventListener('click', () => {
+        const role = th.dataset.role;
+        const wasActive = th.classList.contains('highlighted');
+
+        // Clear all
+        roleHeaders.forEach(h => h.classList.remove('highlighted'));
+        matrix.querySelectorAll('td.highlighted').forEach(td => td.classList.remove('highlighted'));
+
+        if (!wasActive) {
+          th.classList.add('highlighted');
+          matrix.querySelectorAll(`td[data-col="${role}"]`).forEach(td => td.classList.add('highlighted'));
+        }
+      });
+    });
+  }
+
+  // ========== Hub diagram (interactive) ==========
+  const hubData = [
+    { id: 'chat',     label: 'Chat',     angle: -90, info: 'Free-form messaging with typed messages (POST, UPDATE, DECISION, BLOCKER...), threads, reactions, pins, convert-to-task.' },
+    { id: 'tasks',    label: 'Tasks',    angle: -60, info: 'Per-project task board. Sibling: Pulse. List / Board / Calendar views with custom fields.' },
+    { id: 'files',    label: 'Files',    angle: -30, info: 'Per-channel file shelf with previews, versioned uploads. Sibling: Markup for annotation.' },
+    { id: 'tickets',  label: 'Tickets',  angle: 0,   info: 'Structured issue tracker. Sibling: Resolve. BUG | RFI | COORDINATION | CHANGE_REQUEST | CLARIFICATION.' },
+    { id: 'team',     label: 'Team',     angle: 30,  info: 'Member roster with skills, presence, working hours. Sibling: Pivot.' },
+    { id: 'insights', label: 'Insights', angle: 60,  info: 'Per-channel KPI snapshot for last N days (default 14). Sibling: Lens.' },
+    { id: 'meetings', label: 'Meetings', angle: 90,  info: 'Scheduled meetings, call history, paste-link import, MOM note linkage. Sibling: Meet.' },
+    { id: 'notes',    label: 'Notes',    angle: 120, info: 'Per-channel notebook (sections × pages × sub-pages). Internal only — no sibling module.' },
+    { id: 'ai',       label: 'AI',       angle: 150, info: 'NEW — PM assistant grounded in channel tasks, tickets, notes, members. Visible only on PROJECT_SERVICE_ARM channels.' },
+    { id: 'broadcast',label: 'Broadcast',angle: 180, info: 'Org-wide / multi-channel announcements. High-priority broadcasts pin to top of recipient channels.' },
+    { id: 'calendar', label: 'Calendar', angle: 210, info: 'Global surface — unified upcoming meetings across all projects. Source: same meetings-store as per-channel Meet.' },
+    { id: 'mytasks',  label: 'My Tasks', angle: 240, info: 'Personal cross-project surface aggregating tasks from all channels the user is ACTIVE on.' },
+  ];
+
+  const cx = 350, cy = 190;
+  const nodesG = document.getElementById('hub-nodes');
+  const connG = document.getElementById('hub-connectors');
+  const legend = document.getElementById('hub-legend');
+
+  hubData.forEach((node, i) => {
+    // Distribute around an ellipse
+    const rad = (node.angle * Math.PI) / 180;
+    const rx = 250, ry = 130;
+    const x = cx + rx * Math.cos(rad);
+    const y = cy + ry * Math.sin(rad);
+
+    // connector line
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', cx);
+    line.setAttribute('y1', cy);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', y);
+    line.setAttribute('class', 'hub-connector');
+    connG.appendChild(line);
+
+    // node rect
+    const w = 78, h = 28;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x - w/2);
+    rect.setAttribute('y', y - h/2);
+    rect.setAttribute('width', w);
+    rect.setAttribute('height', h);
+    rect.setAttribute('class', 'hub-node');
+    rect.setAttribute('data-id', node.id);
+    nodesG.appendChild(rect);
+
+    // label
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y + 3);
+    text.setAttribute('class', 'hub-label');
+    text.textContent = node.label;
+    nodesG.appendChild(text);
+
+    rect.addEventListener('click', () => {
+      document.querySelectorAll('.hub-node').forEach(n => n.classList.remove('active'));
+      rect.classList.add('active');
+      legend.classList.add('active');
+      legend.innerHTML = `<strong>${node.label}</strong> &nbsp;·&nbsp; ${node.info}`;
+    });
+
+    rect.addEventListener('mouseenter', () => {
+      if (!rect.classList.contains('active')) {
+        legend.innerHTML = `<strong>${node.label}</strong> &nbsp;·&nbsp; ${node.info}`;
+      }
+    });
+  });
+
+  // Open first feature card by default
+  const firstCard = document.querySelector('.feature-card');
+  if (firstCard) firstCard.classList.add('open');
+
+</script>
+
+</body>
+</html>
